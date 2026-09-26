@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GIS Data Optimization Interactive Workshop</title>
+  
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+  
+  <!-- Turf.js for Spatial Computations -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; height: 100vh; overflow: hidden; background: #f4f6f8; }
+    
+    /* Sidebar Layout */
+    #sidebar { width: 380px; background: #ffffff; border-right: 1px solid #dfe3e8; display: flex; flex-direction: column; z-index: 1000; box-shadow: 2px 0 10px rgba(0,0,0,0.05); }
+    .header { padding: 20px; background: #1a237e; color: white; }
+    .header h1 { font-size: 1.2rem; margin-bottom: 5px; }
+    .header p { font-size: 0.8rem; opacity: 0.8; }
+    
+    /* Navigation Tabs */
+    .tabs { display: flex; background: #e8eaf6; border-bottom: 1px solid #c5cae9; }
+    .tab-btn { flex: 1; padding: 12px 5px; border: none; background: none; font-size: 0.8rem; font-weight: 600; color: #3f51b5; cursor: pointer; transition: all 0.2s; }
+    .tab-btn.active { background: white; color: #1a237e; border-bottom: 3px solid #1a237e; }
+    
+    /* Module Control Panels */
+    .panel { display: none; padding: 20px; flex: 1; overflow-y: auto; }
+    .panel.active { display: block; }
+    
+    .card { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 15px; margin-bottom: 15px; }
+    .card h3 { font-size: 0.95rem; color: #212529; margin-bottom: 8px; }
+    .card p { font-size: 0.82rem; color: #6c757d; line-height: 1.4; margin-bottom: 10px; }
+    
+    /* GUI Controls */
+    .control-group { margin-bottom: 12px; }
+    label { display: block; font-size: 0.8rem; font-weight: 600; color: #495057; margin-bottom: 5px; }
+    input[type="range"] { width: 100%; cursor: pointer; }
+    select, button { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ced4da; font-size: 0.85rem; }
+    button { background: #3f51b5; color: white; border: none; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+    button:hover { background: #303f9f; }
+    
+    /* Results Metrics Box */
+    .stats-box { background: #e3f2fd; border-left: 4px solid #2196f3; padding: 10px; margin-top: 10px; border-radius: 4px; }
+    .stats-box p { font-size: 0.8rem; color: #0d47a1; margin: 2px 0; font-weight: bold; }
+    
+    /* Map Canvas */
+    #map { flex: 1; height: 100%; background: #e5e5e5; }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar GUI -->
+  <div id="sidebar">
+    <div class="header">
+      <h1>GIS Optimization Lab</h1>
+      <p>Interactive Spatial Data Problem Solving</p>
+    </div>
+
+    <!-- Module Selector Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchModule(1)">1. Accuracy</button>
+      <button class="tab-btn" onclick="switchModule(2)">2. Volume</button>
+      <button class="tab-btn" onclick="switchModule(3)">3. Efficiency</button>
+      <button class="tab-btn" onclick="switchModule(4)">4. Compatibility</button>
+    </div>
+
+    <!-- MODULE 1 PANEL -->
+    <div id="panel-1" class="panel active">
+      <div class="card">
+        <h3>Topic 1: Accuracy vs Application</h3>
+        <p>A flood barrier wall protects the inland area. Adjust the water level slider to see how resolution scale impacts flood prediction accuracy.</p>
+      </div>
+      <div class="control-group">
+        <label for="flood-slider">Water Level: <span id="flood-val">3</span> meters</label>
+        <input type="range" id="flood-slider" min="0" max="6" step="0.5" value="3" oninput="runModule1()">
+      </div>
+      <div class="stats-box" id="mod1-stats">
+        <p>Status: Barrier Holds (Area Protected)</p>
+      </div>
+    </div>
+
+    <!-- MODULE 2 PANEL -->
+    <div id="panel-2" class="panel">
+      <div class="card">
+        <h3>Topic 2: Controlling Data Volume</h3>
+        <p>Simplify coastline vector geometry using the Douglas-Peucker tolerance slider. Observe point reduction vs geometry distortion.</p>
+      </div>
+      <div class="control-group">
+        <label for="simplify-slider">Tolerance: <span id="simplify-val">0.000</span></label>
+        <input type="range" id="simplify-slider" min="0" max="0.02" step="0.001" value="0" oninput="runModule2()">
+      </div>
+      <div class="stats-box" id="mod2-stats">
+        <p>Vertices: 1,000 pts</p>
+        <p>Size Reduction: 0%</p>
+      </div>
+    </div>
+
+    <!-- MODULE 3 PANEL -->
+    <div id="panel-3" class="panel">
+      <div class="card">
+        <h3>Topic 3: Computational Efficiency</h3>
+        <p>Perform a spatial point-in-polygon query on 2,000 customer points with and without spatial indexing (bounding box filtering).</p>
+      </div>
+      <div class="control-group">
+        <label>
+          <input type="checkbox" id="use-index" style="width: auto;"> Enable Spatial Indexing (Bounding Box)
+        </label>
+      </div>
+      <button onclick="runModule3()">Run Spatial Query</button>
+      <div class="stats-box" id="mod3-stats">
+        <p>Execution Time: -- ms</p>
+        <p>Matches Found: --</p>
+      </div>
+    </div>
+
+    <!-- MODULE 4 PANEL -->
+    <div id="panel-4" class="panel">
+      <div class="card">
+        <h3>Topic 4: Data Compatibility & CRS</h3>
+        <p>Data layers fail to overlay when Coordinate Reference System (CRS) definitions or spatial schemas are mismatched.</p>
+      </div>
+      <div class="control-group">
+        <label for="crs-select">Select Layer CRS:</label>
+        <select id="crs-select" onchange="runModule4()">
+          <option value="missing">Missing CRS Metadata (Raw Defaults)</option>
+          <option value="fixed">Standard EPSG:4326 (WGS 84 Lat/Long)</option>
+        </select>
+      </div>
+      <div class="stats-box" id="mod4-stats">
+        <p>Layer Alignment: Displaced to (0,0)</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Map Container -->
+  <div id="map"></div>
+
+  <script>
+    // Initialize Leaflet Map (Centered on Toledo/San Francisco region context)
+    const map = L.map('map').setView([37.7749, -122.4194], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    let currentLayers = L.layerGroup().addTo(map);
+
+    // Navigation Switcher
+    function switchModule(modNum) {
+      document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', i === modNum - 1));
+      document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === modNum - 1));
+      currentLayers.clearLayers();
+      
+      if (modNum === 1) runModule1();
+      if (modNum === 2) runModule2();
+      if (modNum === 3) initModule3();
+      if (modNum === 4) runModule4();
+    }
+
+    // MODULE 1: Accuracy & Scale Simulation
+    function runModule1() {
+      currentLayers.clearLayers();
+      const waterLevel = parseFloat(document.getElementById('flood-slider').value);
+      document.getElementById('flood-val').innerText = waterLevel;
+
+      // Create flood zone polygon & barrier line
+      const floodArea = L.polygon([
+        [37.76, -122.45], [37.76, -122.40], [37.74, -122.40], [37.74, -122.45]
+      ], { color: waterLevel >= 4.0 ? 'red' : 'blue', fillColor: waterLevel >= 4.0 ? '#f03' : '#30f', fillOpacity: 0.4 }).addTo(currentLayers);
+
+      const barrierWall = L.polyline([
+        [37.765, -122.425], [37.735, -122.425]
+      ], { color: 'black', weight: 6 }).addTo(currentLayers);
+
+      map.fitBounds(floodArea.getBounds());
+
+      const statusBox = document.getElementById('mod1-stats');
+      if (waterLevel >= 4.0) {
+        statusBox.style.borderLeftColor = '#f44336';
+        statusBox.innerHTML = '<p>Status: CRITICAL OVERFLOW (Water > 4m Barrier)</p>';
+      } else {
+        statusBox.style.borderLeftColor = '#2196f3';
+        statusBox.innerHTML = '<p>Status: Protected (Barrier Height = 4.0m)</p>';
+      }
+    }
+
+    // MODULE 2: Volume Control & Line Simplification
+    let rawRoadLine = null;
+    function runModule2() {
+      currentLayers.clearLayers();
+      const tol = parseFloat(document.getElementById('simplify-slider').value);
+      document.getElementById('simplify-val').innerText = tol.toFixed(3);
+
+      // Generate a complex sinusoidal curve
+      if (!rawRoadLine) {
+        let pts = [];
+        for (let i = 0; i < 500; i++) {
+          let lat = 37.75 + (i * 0.0001);
+          let lng = -122.43 + Math.sin(i * 0.1) * 0.01;
+          pts.push([lng, lat]);
+        }
+        rawRoadLine = turf.lineString(pts);
+      }
+
+      let simplified = tol === 0 ? rawRoadLine : turf.simplify(rawRoadLine, { tolerance: tol, highQuality: false });
+      
+      let layer = L.geoJSON(simplified, { style: { color: 'crimson', weight: 3 } }).addTo(currentLayers);
+      map.fitBounds(layer.getBounds());
+
+      let originalCount = rawRoadLine.geometry.coordinates.length;
+      let newCount = simplified.geometry.coordinates.length;
+      let reduction = (((originalCount - newCount) / originalCount) * 100).toFixed(1);
+
+      document.getElementById('mod2-stats').innerHTML = `
+        <p>Vertices: ${newCount} pts (Original: ${originalCount})</p>
+        <p>Data Reduction: ${reduction}%</p>
+      `;
+    }
+
+    // MODULE 3: Computational Speed & Indexing
+    let testPoints = [];
+    let testPolygon = null;
+
+    function initModule3() {
+      currentLayers.clearLayers();
+      // Generate 2,000 random points inside bounds
+      let bbox = [-122.45, 37.74, -122.40, 37.78];
+      testPoints = turf.randomPoint(2000, { bbox: bbox });
+      testPolygon = turf.polygon([[
+        [-122.43, 37.75], [-122.41, 37.75], [-122.41, 37.77], [-122.43, 37.77], [-122.43, 37.75]
+      ]]);
+
+      L.geoJSON(testPoints, { pointToLayer: (f, latlng) => L.circleMarker(latlng, { radius: 2, color: 'gray' }) }).addTo(currentLayers);
+      L.geoJSON(testPolygon, { style: { color: 'green', fillOpacity: 0.2 } }).addTo(currentLayers);
+      map.fitBounds(L.geoJSON(testPolygon).getBounds());
+    }
+
+    function runModule3() {
+      const useIndex = document.getElementById('use-index').checked;
+      const t0 = performance.now();
+      let matchedCount = 0;
+
+      if (useIndex) {
+        // Fast bounding box filtering first (R-Tree emulation)
+        let polyBBox = turf.bbox(testPolygon);
+        let candidates = testPoints.features.filter(pt => {
+          let c = pt.geometry.coordinates;
+          return c[0] >= polyBBox[0] && c[0] <= polyBBox[2] && c[1] >= polyBBox[1] && c[1] <= polyBBox[3];
+        });
+        matchedCount = candidates.filter(pt => turf.booleanPointInPolygon(pt, testPolygon)).length;
+      } else {
+        // Unindexed brute-force loop
+        matchedCount = testPoints.features.filter(pt => turf.booleanPointInPolygon(pt, testPolygon)).length;
+      }
+
+      const t1 = performance.now();
+      const duration = (t1 - t0).toFixed(2);
+
+      document.getElementById('mod3-stats').innerHTML = `
+        <p>Execution Time: ${duration} ms</p>
+        <p>Points Inside Zone: ${matchedCount}</p>
+        <p>Indexing: ${useIndex ? 'ON (Bounding Box Active)' : 'OFF (Brute Force)'}</p>
+      `;
+    }
+
+    // MODULE 4: Compatibility & Coordinate System Fixes
+    function runModule4() {
+      currentLayers.clearLayers();
+      const crsMode = document.getElementById('crs-select').value;
+
+      let cityCenter = [37.7749, -122.4194];
+      let nullCenter = [0.0, 0.0]; // Mismatched CRS displacement
+
+      if (crsMode === 'missing') {
+        L.marker(nullCenter).addTo(currentLayers).bindPopup("Displaced Layer at (0,0)").openPopup();
+        map.setView(nullCenter, 2);
+        document.getElementById('mod4-stats').innerHTML = `<p style="color:red;">Error: Spatial Misalignment (Layer displaced to Gulf of Guinea 0°N 0°E)</p>`;
+      } else {
+        L.marker(cityCenter).addTo(currentLayers).bindPopup("Correctly Aligned Layer (San Francisco)").openPopup();
+        map.setView(cityCenter, 12);
+        document.getElementById('mod4-stats').innerHTML = `<p style="color:green;">Success: Layer aligned using EPSG:4326 metadata</p>`;
+      }
+    }
+
+    // Load Module 1 on startup
+    runModule1();
+  </script>
+</body>
+</html>
