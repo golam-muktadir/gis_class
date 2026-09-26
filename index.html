@@ -72,14 +72,14 @@
     <div id="panel-1" class="panel active">
       <div class="card">
         <h3>Topic 1: Accuracy vs Application</h3>
-        <p>A flood barrier wall protects the inland area. Adjust the water level slider to see how resolution scale impacts flood prediction accuracy.</p>
+        <p>A flood barrier wall protects the city on the right. Drag the slider to raise the water level and observe the expanding flood zone on the map.</p>
       </div>
       <div class="control-group">
-        <label for="flood-slider">Water Level: <span id="flood-val">3</span> meters</label>
-        <input type="range" id="flood-slider" min="0" max="6" step="0.5" value="3" oninput="runModule1()">
+        <label for="flood-slider">Water Level: <span id="flood-val">1.0</span> meters</label>
+        <input type="range" id="flood-slider" min="0.5" max="6.0" step="0.5" value="1.0" oninput="runModule1()">
       </div>
       <div class="stats-box" id="mod1-stats">
-        <p>Status: Barrier Holds (Area Protected)</p>
+        <p>Status: Water Contained</p>
       </div>
     </div>
 
@@ -140,8 +140,8 @@
   <div id="map"></div>
 
   <script>
-    // Initialize Leaflet Map (Centered on Toledo/San Francisco region context)
-    const map = L.map('map').setView([37.7749, -122.4194], 12);
+    // Initialize Leaflet Map
+    const map = L.map('map').setView([37.7600, -122.4200], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
@@ -160,30 +160,82 @@
       if (modNum === 4) runModule4();
     }
 
-    // MODULE 1: Accuracy & Scale Simulation
+    // MODULE 1: Dynamic Flood Expansion Simulation
     function runModule1() {
       currentLayers.clearLayers();
       const waterLevel = parseFloat(document.getElementById('flood-slider').value);
-      document.getElementById('flood-val').innerText = waterLevel;
+      document.getElementById('flood-val').innerText = waterLevel.toFixed(1);
 
-      // Create flood zone polygon & barrier line
-      const floodArea = L.polygon([
-        [37.76, -122.45], [37.76, -122.40], [37.74, -122.40], [37.74, -122.45]
-      ], { color: waterLevel >= 4.0 ? 'red' : 'blue', fillColor: waterLevel >= 4.0 ? '#f03' : '#30f', fillOpacity: 0.4 }).addTo(currentLayers);
+      // Base geographic reference points
+      const westBoundary = -122.4600;
+      const barrierLng = -122.4200;
+      const eastMax = -122.3800;
+      
+      let currentEastLng;
+      let isBreached = false;
 
+      if (waterLevel < 4.0) {
+        // Water expands up to the barrier line (-122.4200)
+        currentEastLng = westBoundary + ((waterLevel / 4.0) * (barrierLng - westBoundary));
+      } else {
+        // Water breaches the barrier line and floods into the city area
+        isBreached = true;
+        currentEastLng = barrierLng + (((waterLevel - 4.0) / 2.0) * (eastMax - barrierLng));
+      }
+
+      // 1. Draw City/Residential Area Marker Grid
+      for (let lat = 37.745; lat <= 37.775; lat += 0.008) {
+        for (let lng = -122.415; lng <= -122.385; lng += 0.008) {
+          L.circleMarker([lat, lng], {
+            radius: 4,
+            color: '#4caf50',
+            fillColor: '#81c784',
+            fillOpacity: 0.8
+          }).addTo(currentLayers).bindTooltip("Protected City Infrastructure");
+        }
+      }
+
+      // 2. Draw Dynamic Flood Polygon
+      const floodPolygon = L.polygon([
+        [37.7800, westBoundary],
+        [37.7800, currentEastLng],
+        [37.7400, currentEastLng],
+        [37.7400, westBoundary]
+      ], {
+        color: isBreached ? '#d32f2f' : '#1976d2',
+        fillColor: isBreached ? '#ef5350' : '#42a5f5',
+        fillOpacity: 0.6,
+        weight: 2
+      }).addTo(currentLayers);
+
+      // 3. Draw Static Barrier Wall Line
       const barrierWall = L.polyline([
-        [37.765, -122.425], [37.735, -122.425]
-      ], { color: 'black', weight: 6 }).addTo(currentLayers);
+        [37.7800, barrierLng],
+        [37.7400, barrierLng]
+      ], {
+        color: '#212121',
+        weight: 7
+      }).addTo(currentLayers).bindTooltip("Flood Wall Protection Barrier (4.0m Height)");
 
-      map.fitBounds(floodArea.getBounds());
+      map.fitBounds([
+        [37.7400, westBoundary],
+        [37.7800, eastMax]
+      ]);
 
+      // 4. Update UI Status Box
       const statusBox = document.getElementById('mod1-stats');
-      if (waterLevel >= 4.0) {
+      if (isBreached) {
         statusBox.style.borderLeftColor = '#f44336';
-        statusBox.innerHTML = '<p>Status: CRITICAL OVERFLOW (Water > 4m Barrier)</p>';
+        statusBox.innerHTML = `
+          <p style="color:#d32f2f;">Status: BARRIER BREACHED!</p>
+          <p>Water Level (${waterLevel.toFixed(1)}m) exceeds 4.0m wall height. Inundation expanding east into urban structures.</p>
+        `;
       } else {
         statusBox.style.borderLeftColor = '#2196f3';
-        statusBox.innerHTML = '<p>Status: Protected (Barrier Height = 4.0m)</p>';
+        statusBox.innerHTML = `
+          <p style="color:#0d47a1;">Status: Water Safely Contained</p>
+          <p>Barrier wall holds up to 4.0m height. Urban area protected.</p>
+        `;
       }
     }
 
@@ -194,7 +246,6 @@
       const tol = parseFloat(document.getElementById('simplify-slider').value);
       document.getElementById('simplify-val').innerText = tol.toFixed(3);
 
-      // Generate a complex sinusoidal curve
       if (!rawRoadLine) {
         let pts = [];
         for (let i = 0; i < 500; i++) {
@@ -226,7 +277,6 @@
 
     function initModule3() {
       currentLayers.clearLayers();
-      // Generate 2,000 random points inside bounds
       let bbox = [-122.45, 37.74, -122.40, 37.78];
       testPoints = turf.randomPoint(2000, { bbox: bbox });
       testPolygon = turf.polygon([[
@@ -244,7 +294,6 @@
       let matchedCount = 0;
 
       if (useIndex) {
-        // Fast bounding box filtering first (R-Tree emulation)
         let polyBBox = turf.bbox(testPolygon);
         let candidates = testPoints.features.filter(pt => {
           let c = pt.geometry.coordinates;
@@ -252,7 +301,6 @@
         });
         matchedCount = candidates.filter(pt => turf.booleanPointInPolygon(pt, testPolygon)).length;
       } else {
-        // Unindexed brute-force loop
         matchedCount = testPoints.features.filter(pt => turf.booleanPointInPolygon(pt, testPolygon)).length;
       }
 
@@ -272,7 +320,7 @@
       const crsMode = document.getElementById('crs-select').value;
 
       let cityCenter = [37.7749, -122.4194];
-      let nullCenter = [0.0, 0.0]; // Mismatched CRS displacement
+      let nullCenter = [0.0, 0.0];
 
       if (crsMode === 'missing') {
         L.marker(nullCenter).addTo(currentLayers).bindPopup("Displaced Layer at (0,0)").openPopup();
